@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import type { ComponentProps, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import {
   AnimatePresence,
   MotionConfig,
@@ -400,6 +400,30 @@ const charVariants: Variants = {
   exit: { y: '-120%', rotate: -10, opacity: 0, transition: { duration: 0.12 } },
 };
 
+const HOVER_QUERY = '(hover: hover) and (pointer: fine)';
+
+/** Mengikuti media query di sisi client. Awalnya false supaya SSR dan render pertama client sama. */
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const update = () => setMatches(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, [query]);
+
+  return matches;
+}
+
+/** Magnet hanya aktif di perangkat dengan mouse. Di layar sentuh, tombol tetap diam. */
+function SafeMagnet(props: ComponentProps<typeof Magnet>) {
+  const canHover = useMediaQuery(HOVER_QUERY);
+  if (!canHover) return <>{props.children}</>;
+  return <Magnet {...props} />;
+}
+
 function Icon({ name, className = '' }: { name: string; className?: string }) {
   return (
     <span className={`material-symbols-outlined ${className}`} aria-hidden="true">
@@ -452,7 +476,7 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         <span className="nb-tag w-fit bg-accent text-on-accent">
           <DecryptedText
             text={`${index} // ${label}`}
@@ -483,7 +507,7 @@ function SectionHeader({
 
 function RoleTyper({ active }: { active: boolean }) {
   return (
-    <span className="inline-flex h-10 items-center border-[3px] border-line bg-accent-soft px-3 font-mono text-sm font-bold uppercase text-ink sm:text-base">
+    <span className="inline-flex h-10 max-w-full items-center border-[3px] border-line bg-accent-soft px-3 font-mono text-sm font-bold uppercase text-ink sm:text-base">
       <TextType
         key={active ? 'on' : 'off'}
         as="span"
@@ -627,6 +651,10 @@ function AvatarCard({ isLoaded, reduce }: { isLoaded: boolean; reduce: boolean }
   const stickerA = useTransform(sx, (v) => v * 28);
   const stickerB = useTransform(sx, (v) => v * -28);
 
+  // Di HP, kemiringan layer belakang dikecilkan supaya sudutnya tidak keluar layar.
+  const wide = useMediaQuery('(min-width: 640px)');
+  const k = wide ? 1 : 0.4;
+
   const onMove = (e: ReactMouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     mx.set((e.clientX - r.left) / r.width - 0.5);
@@ -638,20 +666,20 @@ function AvatarCard({ isLoaded, reduce }: { isLoaded: boolean; reduce: boolean }
       variants={slideRight}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      className="relative flex flex-col lg:col-span-5"
+      className="relative flex min-w-0 flex-col lg:col-span-5"
     >
       <motion.div
         aria-hidden="true"
         className="absolute inset-0 border-[3px] border-line bg-card"
         style={{ transformOrigin: 'bottom right' }}
-        animate={{ rotate: isLoaded && !reduce ? [-2.5, -4, -2.5] : -2.5 }}
+        animate={{ rotate: isLoaded && !reduce ? [-2.5 * k, -4 * k, -2.5 * k] : -2.5 * k }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
         aria-hidden="true"
         className="absolute inset-0 border-[3px] border-line bg-accent-2"
         style={{ transformOrigin: 'bottom left' }}
-        animate={{ rotate: isLoaded && !reduce ? [3, 4.5, 3] : 3 }}
+        animate={{ rotate: isLoaded && !reduce ? [3 * k, 4.5 * k, 3 * k] : 3 * k }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
       />
 
@@ -783,7 +811,7 @@ function DeveloperPanel({ isLoaded, reduce }: { isLoaded: boolean; reduce: boole
 
   return (
     <>
-      <div className="nb-card flex flex-col overflow-hidden bg-[#0d0d10] text-[#f4f4f5]">
+      <div className="nb-card flex min-w-0 flex-col overflow-hidden bg-[#0d0d10] text-[#f4f4f5]">
         <div className="flex items-center justify-between border-b-[3px] border-line bg-card-2 px-4 py-2 text-ink">
           <div className="flex items-center gap-2" aria-hidden="true">
             <span className="inline-block h-3 w-3 rounded-full border-2 border-line bg-[#ff5f56]" />
@@ -823,7 +851,7 @@ function DeveloperPanel({ isLoaded, reduce }: { isLoaded: boolean; reduce: boole
         </motion.div>
       </div>
 
-      <div className="nb-card relative flex min-h-[200px] flex-1 flex-col justify-center overflow-hidden bg-accent p-4 text-on-accent">
+      <div className="nb-card relative flex min-h-[200px] min-w-0 flex-1 flex-col justify-center overflow-hidden bg-accent p-4 text-on-accent">
         <div className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:radial-gradient(#141414_1px,transparent_1px)] [background-size:18px_18px]" />
         <motion.div
           whileHover={{ x: -2, y: -2 }}
@@ -843,9 +871,9 @@ function DeveloperPanel({ isLoaded, reduce }: { isLoaded: boolean; reduce: boole
 
 function SpotifyCard() {
   return (
-    <div className="nb-card flex flex-col gap-4 bg-[#121212] p-4 text-white sm:p-5">
+    <div className="nb-card flex min-w-0 flex-col gap-4 bg-[#121212] p-4 text-white sm:p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <svg viewBox="0 0 24 24" className="h-11 w-11 shrink-0 fill-[#1DB954]" aria-hidden="true">
             <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
           </svg>
@@ -861,7 +889,7 @@ function SpotifyCard() {
         src={SPOTIFY_EMBED}
         width="100%"
         height="352"
-        style={{ borderRadius: 12, border: 0 }}
+        style={{ borderRadius: 12, border: 0, maxWidth: '100%' }}
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
       />
@@ -882,11 +910,11 @@ function SpotifyCard() {
 
 function PlaylistSection() {
   return (
-    <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
       <Reveal
         x={-48}
         y={0}
-        className="nb-card relative flex flex-col justify-between gap-10 overflow-hidden bg-accent p-6 text-on-accent sm:p-8 lg:col-span-5"
+        className="nb-card relative flex min-w-0 flex-col justify-between gap-10 overflow-hidden bg-accent p-6 text-on-accent sm:p-8 lg:col-span-5"
       >
         <div className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:radial-gradient(#141414_1px,transparent_1px)] [background-size:18px_18px]" />
 
@@ -917,7 +945,7 @@ function PlaylistSection() {
         </div>
       </Reveal>
 
-      <Reveal x={48} y={0} delay={0.1} className="lg:col-span-7">
+      <Reveal x={48} y={0} delay={0.1} className="min-w-0 lg:col-span-7">
         <SpotifyCard />
       </Reveal>
     </div>
@@ -956,6 +984,7 @@ export default function Home() {
   const [showTop, setShowTop] = useState(false);
 
   const reduce = !!useReducedMotion();
+  const canHover = useMediaQuery(HOVER_QUERY);
   const { scrollY, scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 });
 
@@ -1073,7 +1102,8 @@ export default function Home() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative min-h-screen">
+      {/* overflow-x-clip: elemen yang masuk dari samping tidak lagi melebarkan halaman di HP */}
+      <div className="relative min-h-screen overflow-x-clip">
         {/* Splash Screen Section */}
         <AnimatePresence>
           {!isLoaded && (
@@ -1299,14 +1329,14 @@ export default function Home() {
           {/* Hero Section */}
           <motion.section
             id="home"
-            className="grid items-stretch gap-6 lg:grid-cols-12 lg:gap-8"
+            className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 lg:gap-8"
             variants={stagger(0.15, 0.1)}
             initial="hidden"
             animate={isLoaded ? 'show' : 'hidden'}
           >
             <motion.div
               variants={slideLeft}
-              className="nb-card relative flex flex-col justify-between gap-10 overflow-hidden p-6 sm:p-10 lg:col-span-7"
+              className="nb-card relative flex min-w-0 flex-col justify-between gap-10 overflow-hidden p-6 sm:p-10 lg:col-span-7"
             >
               {isLoaded && !reduce ? (
                 <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -1380,7 +1410,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <motion.div variants={fadeUp}>
+                <motion.div variants={fadeUp} className="max-w-full">
                   <RoleTyper active={isLoaded} />
                 </motion.div>
 
@@ -1394,13 +1424,13 @@ export default function Home() {
                 variants={fadeUp}
                 className="relative flex flex-wrap items-center gap-4 border-t-[3px] border-line pt-6"
               >
-                <Magnet padding={60} magnetStrength={4}>
+                <SafeMagnet padding={60} magnetStrength={4}>
                   <motion.a href="#projects" onClick={goTo('projects')} {...PRESS} className="nb-btn bg-accent text-on-accent">
                     <span>View projects</span>
                     <Icon name="north_east" className="text-[20px]" />
                   </motion.a>
-                </Magnet>
-                <Magnet padding={60} magnetStrength={4}>
+                </SafeMagnet>
+                <SafeMagnet padding={60} magnetStrength={4}>
                   <motion.a
                     href={CV_URL}
                     target="_blank"
@@ -1411,7 +1441,7 @@ export default function Home() {
                     <span>Download CV</span>
                     <Icon name="download" className="text-[20px]" />
                   </motion.a>
-                </Magnet>
+                </SafeMagnet>
               </motion.div>
             </motion.div>
 
@@ -1426,11 +1456,11 @@ export default function Home() {
           {/* About Section */}
           <section id="about" className="scroll-mt-28">
             <SectionHeader index="01" label="About" title="About me" />
-            <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
               <Reveal
                 x={-48}
                 y={0}
-                className="nb-card flex flex-col justify-between gap-8 p-6 sm:p-8 lg:col-span-7"
+                className="nb-card flex min-w-0 flex-col justify-between gap-8 p-6 sm:p-8 lg:col-span-7"
               >
                 <ScrollReveal
                   baseOpacity={0.15}
@@ -1460,7 +1490,7 @@ export default function Home() {
                 </div>
               </Reveal>
 
-              <Reveal x={48} y={0} delay={0.1} className="flex flex-col gap-6 lg:col-span-5">
+              <Reveal x={48} y={0} delay={0.1} className="flex min-w-0 flex-col gap-6 lg:col-span-5">
                 <DeveloperPanel isLoaded={isLoaded} reduce={reduce} />
               </Reveal>
             </div>
@@ -1549,13 +1579,13 @@ export default function Home() {
                   distance={72}
                   duration={0.9}
                 >
-                  <article className="nb-card grid overflow-hidden lg:grid-cols-12">
+                  <article className="nb-card grid grid-cols-1 overflow-hidden lg:grid-cols-12">
                     <div
-                      className={`flex flex-col justify-between gap-6 border-b-[3px] border-line p-6 lg:col-span-4 lg:border-b-0 lg:border-r-[3px] ${e.tone}`}
+                      className={`flex min-w-0 flex-col justify-between gap-6 border-b-[3px] border-line p-6 lg:col-span-4 lg:border-b-0 lg:border-r-[3px] ${e.tone}`}
                     >
                       <div className="flex flex-col gap-3">
                         <span className="font-mono text-xs font-bold uppercase tracking-wider">{e.type}</span>
-                        <h3 className="text-2xl font-black uppercase leading-tight">{e.org}</h3>
+                        <h3 className="break-words text-2xl font-black uppercase leading-tight">{e.org}</h3>
                       </div>
                       <span className="nb-tag w-fit bg-card text-ink">
                         {e.current && (
@@ -1569,7 +1599,7 @@ export default function Home() {
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-5 p-6 sm:p-8 lg:col-span-8">
+                    <div className="flex min-w-0 flex-col gap-5 p-6 sm:p-8 lg:col-span-8">
                       <div>
                         <h4 className="text-xl font-black sm:text-2xl">{e.role}</h4>
                         <p className="mt-1 text-ink-soft">{e.meta}</p>
@@ -1588,7 +1618,7 @@ export default function Home() {
                             className="flex items-start gap-3 leading-relaxed text-ink-soft"
                           >
                             <span className="mt-2 h-2.5 w-2.5 shrink-0 border-2 border-line bg-accent-2" />
-                            <span>{p}</span>
+                            <span className="min-w-0">{p}</span>
                           </motion.li>
                         ))}
                       </motion.ul>
@@ -1631,13 +1661,13 @@ export default function Home() {
                 </motion.a>
               }
             />
-            <div className="grid gap-6 md:grid-cols-2 lg:gap-8">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
               {projects.map((p, i) => (
-                <AnimatedContent key={p.title} className="flex" distance={64} delay={(i % 2) * 0.12} duration={0.9}>
+                <AnimatedContent key={p.title} className="flex min-w-0" distance={64} delay={(i % 2) * 0.12} duration={0.9}>
                   <motion.article
                     variants={cardHover}
                     whileHover="hover"
-                    className="nb-card nb-lift flex w-full flex-col overflow-hidden"
+                    className="nb-card nb-lift flex w-full min-w-0 flex-col overflow-hidden"
                   >
                     <div className="relative h-52 border-b-[3px] border-line bg-card-3 sm:h-60">
                       <GlareHover
@@ -1706,13 +1736,13 @@ export default function Home() {
           {/* Certificates Section */}
           <section id="certificates" className="scroll-mt-28">
             <SectionHeader index="05" label="Certs" title="Certificates" />
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
               {certs.map((c, i) => (
-                <AnimatedContent key={c.title} className="flex" distance={64} delay={(i % 3) * 0.1} duration={0.9}>
+                <AnimatedContent key={c.title} className="flex min-w-0" distance={64} delay={(i % 3) * 0.1} duration={0.9}>
                   <motion.article
                     variants={cardHover}
                     whileHover="hover"
-                    className="nb-card nb-lift flex w-full flex-col gap-4 p-5"
+                    className="nb-card nb-lift flex w-full min-w-0 flex-col gap-4 p-5"
                   >
                     <div className="relative h-44 sm:h-48 [&_img]:rounded-none [&_img]:border-[3px] [&_img]:border-line">
                       <TiltedCard
@@ -1782,14 +1812,14 @@ export default function Home() {
           <section id="contact" className="scroll-mt-28">
             <Reveal
               y={56}
-              className="nb-card relative overflow-hidden bg-accent-2 p-8 text-on-accent-2 sm:p-12"
+              className="nb-card relative overflow-hidden bg-accent-2 p-6 text-on-accent-2 sm:p-12"
             >
               <div className="pointer-events-none absolute inset-0 opacity-[0.15] [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:18px_18px]" />
               <div className="relative flex flex-col gap-10">
-                <div className="grid items-center gap-8 lg:grid-cols-12">
-                  <div className="flex flex-col items-start gap-5 lg:col-span-8">
+                <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
+                  <div className="flex min-w-0 flex-col items-start gap-5 lg:col-span-8">
                     <span className="nb-tag bg-card text-ink">Interested in collaborating?</span>
-                    <h2 className="text-5xl font-black uppercase leading-[1.02] tracking-tight sm:text-6xl">
+                    <h2 className="text-4xl font-black uppercase leading-[1.02] tracking-tight min-[420px]:text-5xl sm:text-6xl">
                       Let&apos;s{' '}
                       <motion.span
                         className="inline-block border-[3px] border-line bg-accent px-3 text-on-accent shadow-[4px_4px_0_0_var(--shade)]"
@@ -1809,7 +1839,7 @@ export default function Home() {
                       <span className="text-sm">Direct inquiries &amp; quest</span>
                     </div>
                   </div>
-                  <div className="lg:col-span-4">
+                  <div className="min-w-0 lg:col-span-4">
                     <motion.a
                       href={`mailto:${EMAIL}`}
                       {...PRESS}
@@ -1835,7 +1865,7 @@ export default function Home() {
                   >
                     {socials.map((s) => (
                       <motion.li key={s.name} variants={popIn}>
-                        <Magnet padding={50} magnetStrength={3}>
+                        <SafeMagnet padding={50} magnetStrength={3}>
                           <motion.a
                             href={s.href}
                             target="_blank"
@@ -1848,7 +1878,7 @@ export default function Home() {
                               <path d={s.path} />
                             </svg>
                           </motion.a>
-                        </Magnet>
+                        </SafeMagnet>
                       </motion.li>
                     ))}
                   </motion.ul>
@@ -1891,8 +1921,8 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* Custom Target Cursor */}
-        {isLoaded && !reduce && (
+        {/* Custom Target Cursor: hanya untuk perangkat dengan mouse */}
+        {isLoaded && !reduce && canHover && (
           <TargetCursor
             targetSelector=".cursor-target, .nb-btn"
             spinDuration={3}
